@@ -338,9 +338,10 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.AddToCart(task)
 	}
 
@@ -400,9 +401,10 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.GetCheckoutPage(task)
 	}
 
@@ -474,9 +476,10 @@ func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.SubmitUserInfo(task)
 	}
 
@@ -549,9 +552,10 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.AddAddress(task)
 	}
 
@@ -630,9 +634,10 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.VerifyAddress(task, csrfToken)
 	}
 
@@ -713,9 +718,10 @@ func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.SubmitVerifiedAddress(task)
 	}
 
@@ -770,9 +776,10 @@ func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
 		return 0, "", err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.GetAdyen(task)
 	}
 
@@ -857,9 +864,10 @@ func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+	proxy := f.Rotate()
+
+	if res.StatusCode != 200 && proxy != "" {
+		f.Client.SetProxy(proxy)
 		return f.PlaceOrder(task)
 	}
 
@@ -892,9 +900,9 @@ func (f *Footlocker) AdyenEncrypt(task shared.Task, publicKey string) (int, stri
 }
 
 func (f *Footlocker) Rotate() string {
-	newProxy := ProxyRotator()
+	newProxy := ProxyRotator(false)
 
-	if len(newProxy) > 0 {
+	if newProxy != " " {
 		return newProxy
 	}
 

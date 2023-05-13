@@ -1,16 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"footlocker-bot/internal"
 	"footlocker-bot/internal/logger"
 	"footlocker-bot/internal/shared"
+	"time"
 )
 
 func main() {
 	l := logger.NewLogger()
 	footlocker := internal.NewFootlockerBot()
-	// datadome := internal.NewDatadome()
 	l.EnableDebug()
 
 	task := shared.Task{
@@ -66,65 +65,56 @@ func main() {
 	// product url
 	footlocker.Log.Info("productUrl: ", task.ProductURL)
 
-	proxy := internal.ProxyRotator()
-	fmt.Println("proxy randomly: ", proxy)
+	// GetHome
+	GetHomeStatus, _ := footlocker.GetHome(task)
+	footlocker.Log.Info("GetHomeStatus: ", GetHomeStatus)
 
-	footlocker.Client.SetProxy(proxy)
+	time.Sleep(1 * time.Second)
 
-	currentProxy := footlocker.Client.GetProxy()
-	footlocker.Log.Info("current proxy: ", currentProxy)
+	// GetProduct
+	GetProductStatus, _ := footlocker.GetProduct(task)
+	footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
 
-	// // GetHome
-	// GetHomeStatus, _ := footlocker.GetHome(task)
-	// footlocker.Log.Info("GetHomeStatus: ", GetHomeStatus)
+	time.Sleep(1 * time.Second)
 
-	// time.Sleep(1 * time.Second)
+	// TimeStamp
+	TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task)
+	footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
+	footlocker.Log.Debug("csrfToken: ", csrfToken)
 
-	// // GetProduct
-	// GetProductStatus, _ := footlocker.GetProduct(task)
-	// footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
+	time.Sleep(2 * time.Second)
 
-	// time.Sleep(1 * time.Second)
+	// AddToCart
+	AddToCartStatus, _ := footlocker.AddToCart(task)
+	footlocker.Log.Info("ATC Status: ", AddToCartStatus)
 
-	// // TimeStamp
-	// TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task)
-	// footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
-	// footlocker.Log.Debug("csrfToken: ", csrfToken)
+	if AddToCartStatus != 200 {
+		return
+	}
 
-	// time.Sleep(2 * time.Second)
+	// GetCheckoutpgae
+	GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task)
+	footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
 
-	// // AddToCart
-	// AddToCartStatus, _ := footlocker.AddToCart(task)
-	// footlocker.Log.Info("ATC Status: ", AddToCartStatus)
+	// SubmitUserInfo
+	SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task)
+	footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
 
-	// if AddToCartStatus != 200 {
-	// 	footlocker.Log.Error("ATC status not ok", nil)
-	// 	return
-	// }
+	// AddAddress
+	AddAddressStatus, _ := footlocker.AddAddress(task)
+	footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
 
-	// // GetCheckoutpgae
-	// GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task)
-	// footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
+	// VerifyAddress
+	VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken)
+	footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
 
-	// // SubmitUserInfo
-	// SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task)
-	// footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
+	// SubmitVerifiedAddress
+	SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task)
+	footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
 
-	// // AddAddress
-	// AddAddressStatus, _ := footlocker.AddAddress(task)
-	// footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
-
-	// // VerifyAddress
-	// VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken)
-	// footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
-
-	// // SubmitVerifiedAddress
-	// SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task)
-	// footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
-
-	// // GetAdyen
-	// GetAdyenStatus, publicKey, _ := footlocker.GetAdyen(task)
-	// footlocker.Log.Info("GetAdyenStatus: ", GetAdyenStatus)
-	// footlocker.Log.Info("publicKey: ", publicKey)
+	// GetAdyen
+	GetAdyenStatus, publicKey, _ := footlocker.GetAdyen(task)
+	footlocker.Log.Info("GetAdyenStatus: ", GetAdyenStatus)
+	footlocker.Log.Info("publicKey: ", publicKey)
 
 }

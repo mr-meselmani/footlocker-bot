@@ -8,7 +8,11 @@ import (
 	"time"
 )
 
-func ProxyRotator() string {
+func ProxyRotator(useProxy bool) string {
+	if !useProxy {
+		return ""
+	}
+
 	// Create a new source of random numbers seeded with the current time
 	source := rand.NewSource(time.Now().UnixNano())
 
