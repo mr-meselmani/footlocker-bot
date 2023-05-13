@@ -29,8 +29,8 @@ func (l *Logger) Info(message string, add interface{}) {
 	fmt.Printf("%s %s %s %v\n", color.RedString(time.Now().Format("2006-01-02 15:04:05")), color.HiBlueString("[ INFO ]"), color.HiBlueString(message), add)
 }
 
-func (l *Logger) Warning(message string) {
-	fmt.Printf("%s %s %v\n", color.RedString(time.Now().Format("2006-01-02 15:04:05")), color.HiRedString("[ WARNING ]"), color.HiRedString(message))
+func (l *Logger) Warning(message string, add interface{}) {
+	fmt.Printf("%s %s %s %v\n", color.RedString(time.Now().Format("2006-01-02 15:04:05")), color.HiRedString("[ WARNING ]"), color.HiRedString(message), add)
 }
 
 func (l *Logger) Error(message string, add interface{}) {

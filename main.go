@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"footlocker-bot/internal"
 	"footlocker-bot/internal/logger"
 	"footlocker-bot/internal/shared"
-	"time"
 )
 
 func main() {
@@ -66,57 +66,65 @@ func main() {
 	// product url
 	footlocker.Log.Info("productUrl: ", task.ProductURL)
 
-	// GetHome
-	GetHomeStatus, _ := footlocker.GetHome(task)
-	footlocker.Log.Info("GetHomeStatus: ", GetHomeStatus)
+	proxy := internal.ProxyRotator()
+	fmt.Println("proxy randomly: ", proxy)
 
-	time.Sleep(1 * time.Second)
+	footlocker.Client.SetProxy(proxy)
 
-	// GetProduct
-	GetProductStatus, _ := footlocker.GetProduct(task)
-	footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
+	currentProxy := footlocker.Client.GetProxy()
+	footlocker.Log.Info("current proxy: ", currentProxy)
 
-	time.Sleep(1 * time.Second)
+	// // GetHome
+	// GetHomeStatus, _ := footlocker.GetHome(task)
+	// footlocker.Log.Info("GetHomeStatus: ", GetHomeStatus)
 
-	// TimeStamp
-	TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task)
-	footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
-	footlocker.Log.Debug("csrfToken: ", csrfToken)
+	// time.Sleep(1 * time.Second)
 
-	time.Sleep(2 * time.Second)
+	// // GetProduct
+	// GetProductStatus, _ := footlocker.GetProduct(task)
+	// footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
 
-	// AddToCart
-	AddToCartStatus, _ := footlocker.AddToCart(task)
-	footlocker.Log.Info("ATC Status: ", AddToCartStatus)
+	// time.Sleep(1 * time.Second)
 
-	if AddToCartStatus != 200 {
-		footlocker.Log.Error("ATC status not ok", nil)
-		return
-	}
+	// // TimeStamp
+	// TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task)
+	// footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
+	// footlocker.Log.Debug("csrfToken: ", csrfToken)
 
-	// GetCheckoutpgae
-	GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task)
-	footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
+	// time.Sleep(2 * time.Second)
 
-	// SubmitUserInfo
-	SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task)
-	footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
+	// // AddToCart
+	// AddToCartStatus, _ := footlocker.AddToCart(task)
+	// footlocker.Log.Info("ATC Status: ", AddToCartStatus)
 
-	// AddAddress
-	AddAddressStatus, _ := footlocker.AddAddress(task)
-	footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
+	// if AddToCartStatus != 200 {
+	// 	footlocker.Log.Error("ATC status not ok", nil)
+	// 	return
+	// }
 
-	// VerifyAddress
-	VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken)
-	footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
+	// // GetCheckoutpgae
+	// GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task)
+	// footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
 
-	// SubmitVerifiedAddress
-	SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task)
-	footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
+	// // SubmitUserInfo
+	// SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task)
+	// footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
 
-	// GetAdyen
-	GetAdyenStatus, publicKey, _ := footlocker.GetAdyen(task)
-	footlocker.Log.Info("GetAdyenStatus: ", GetAdyenStatus)
-	footlocker.Log.Info("publicKey: ", publicKey)
+	// // AddAddress
+	// AddAddressStatus, _ := footlocker.AddAddress(task)
+	// footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
+
+	// // VerifyAddress
+	// VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken)
+	// footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
+
+	// // SubmitVerifiedAddress
+	// SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task)
+	// footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
+
+	// // GetAdyen
+	// GetAdyenStatus, publicKey, _ := footlocker.GetAdyen(task)
+	// footlocker.Log.Info("GetAdyenStatus: ", GetAdyenStatus)
+	// footlocker.Log.Info("publicKey: ", publicKey)
 
 }

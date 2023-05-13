@@ -1,6 +1,10 @@
 package footlocker
 
-import "time"
+import (
+	"time"
+
+	http "github.com/bogdanfinn/fhttp"
+)
 
 type TimestampResponse struct {
 	Data    TimestampData `json:"data"`
@@ -109,4 +113,18 @@ type PlaceOrderPayload struct {
 	CheckoutType    string `json:"checkoutType"`
 	OptIn           bool   `json:"optIn"`
 	DeviceID        string `json:"deviceId"`
+}
+
+type DatadomePayload struct {
+	API_KEY         string            `json:apiKey`
+	Data            map[string]string `json:data`
+	Headers         map[string]string `json:headers`
+	Method          string            `json:method`
+	URL             string            `json:url`
+	Hello_Client    string            `json:helloClient`
+	Browser_Type    string            `json:browserType`
+	Cloudflare      bool              `json:cloudflare`
+	Proxy           string            `json:proxy`
+	Cookies         []*http.Cookie    `json:cookies`
+	Allow_Redirects bool              `json:allowRedirects`
 }

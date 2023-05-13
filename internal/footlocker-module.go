@@ -42,7 +42,7 @@ func (f *Footlocker) GetFootlockerSettings(settings shared.Settings) error {
 		tls_client.WithClientProfile(tls_client.Chrome_112),
 		tls_client.WithNotFollowRedirects(),
 		tls_client.WithCookieJar(jar),
-		// tls_client.WithProxyUrl("http://127.0.0.1:8888"),
+		tls_client.WithProxyUrl("http://127.0.0.1:8888"),
 	}
 
 	client, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
@@ -111,6 +111,12 @@ func (f *Footlocker) GetHome(task shared.Task) (int, error) {
 		return 0, err
 	}
 
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.GetHome(task)
+	}
+
 	return res.StatusCode, nil
 }
 
@@ -168,6 +174,12 @@ func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
 	if err != nil {
 		f.Log.Debug("GetProduct response error: ", err)
 		return 0, err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.GetProduct(task)
 	}
 
 	return res.StatusCode, nil
@@ -229,6 +241,12 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 	if err != nil {
 		f.Log.Debug("TimeStamp response error: ", err)
 		return 0, "", err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.TimeStamp(task)
 	}
 
 	defer res.Body.Close()
@@ -320,6 +338,12 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 		return 0, err
 	}
 
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.AddToCart(task)
+	}
+
 	return res.StatusCode, nil
 }
 
@@ -374,6 +398,12 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 	if err != nil {
 		f.Log.Debug("GetCheckoutPage response error: ", err)
 		return 0, err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.GetCheckoutPage(task)
 	}
 
 	return res.StatusCode, nil
@@ -444,6 +474,12 @@ func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
 		return 0, err
 	}
 
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.SubmitUserInfo(task)
+	}
+
 	return res.StatusCode, nil
 }
 
@@ -511,6 +547,12 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 	if err != nil {
 		f.Log.Debug("AddAddress response error: ", err)
 		return 0, err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.AddAddress(task)
 	}
 
 	return res.StatusCode, nil
@@ -586,6 +628,12 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 	if err != nil {
 		f.Log.Debug("VerifyAddress response error: ", err)
 		return 0, err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.VerifyAddress(task, csrfToken)
 	}
 
 	return res.StatusCode, nil
@@ -665,6 +713,12 @@ func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
 		return 0, err
 	}
 
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.SubmitVerifiedAddress(task)
+	}
+
 	return res.StatusCode, nil
 }
 
@@ -714,6 +768,12 @@ func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
 	if err != nil {
 		f.Log.Debug("GetAdyen response error: ", err)
 		return 0, "", err
+	}
+
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.GetAdyen(task)
 	}
 
 	defer res.Body.Close()
@@ -797,6 +857,12 @@ func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
 		return 0, err
 	}
 
+	if res.StatusCode != 200 {
+		p := f.Rotate()
+		f.Client.SetProxy(p)
+		return f.PlaceOrder(task)
+	}
+
 	return res.StatusCode, nil
 }
 
@@ -823,4 +889,63 @@ func (f *Footlocker) AdyenEncrypt(task shared.Task, publicKey string) (int, stri
 	encryptedSecurityCode, _ := enc.EncryptField("encryptedSecurityCode", task.Profile.Cvv)
 
 	return 200, encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedSecurityCode, nil
+}
+
+func (f *Footlocker) Rotate() string {
+	newProxy := ProxyRotator()
+
+	if len(newProxy) > 0 {
+		return newProxy
+	}
+
+	f.Log.Error("No proxies found: ", "check proxies.txt")
+
+	return ""
+}
+
+func (f *Footlocker) GetDatadomeCookies(task shared.Task) (int, error) {
+	data := footlocker.DatadomePayload{
+		API_KEY:         "NSO-4233-5667-5920",
+		Data:            make(map[string]string),
+		Headers:         make(map[string]string),
+		Method:          "POST",
+		URL:             "http://ip-api.com/json/?fields=61439",
+		Hello_Client:    "HelloChrome_Auto",
+		Browser_Type:    "Chrome",
+		Cloudflare:      false,
+		Proxy:           f.Client.GetProxy(),
+		Cookies:         nil,
+		Allow_Redirects: false,
+	}
+
+	json, _ := json.Marshal(data)
+
+	req, err := http.NewRequest(http.MethodPost, "https://notsoldout.shop/requester_api", bytes.NewBuffer(json))
+	if err != nil {
+		f.Log.Debug("Failed to issue GetDatadomeCookies: ", err)
+		return 0, err
+	}
+
+	req.Header = http.Header{
+		"content-type": {"application/json"},
+		"apikey":       {"NSO-4233-5667-5920"},
+		"proxy":        {f.Client.GetProxy()},
+		"helloclient":  {"HelloChrome_Auto"},
+		"browsertype":  {"Chrome"},
+		http.HeaderOrderKey: {
+			"content-type",
+			"apikey",
+			"proxy",
+			"helloclient",
+			"browsertype",
+		},
+	}
+
+	res, err := f.Client.Do(req)
+	if err != nil {
+		f.Log.Debug("GetDatadomeCookies response error: ", err)
+		return 0, err
+	}
+
+	return res.StatusCode, nil
 }
