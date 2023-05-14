@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 type Footlocker struct {
 	Client tls_client.HttpClient
 	Log    logger.Logger
+	Ctx    context.Context
 }
 
 func NewFootlockerBot() Footlocker {
@@ -59,11 +61,15 @@ func (f *Footlocker) GetFootlockerSettings(settings shared.Settings) error {
 	return nil
 }
 
-func (f *Footlocker) GetHome(task shared.Task) (int, error) {
+// Requests
+func (f *Footlocker) GetHome(task shared.Task) (int, string, error) {
+	// f.Flip()
+	// f.Log.Debug("Current proxy: ", f.Client.GetProxy())
+
 	req, err := http.NewRequest(http.MethodGet, "https://www.footlocker.com/", nil)
 	if err != nil {
 		f.Log.Debug("Failed to issue GetHome request: ", err)
-		return 0, err
+		return 0, "", err
 	}
 
 	req.Header = http.Header{
@@ -71,13 +77,10 @@ func (f *Footlocker) GetHome(task shared.Task) (int, error) {
 		"accept":                      {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"},
 		"accept-encoding":             {"gzip, deflate, br"},
 		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
-		"sec-ch-device-memory":        {"8"},
 		"sec-ch-ua":                   {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
-		"sec-ch-ua-arch":              {`"x86"`},
 		"sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
 		"sec-ch-ua-mobile":            {"?0"},
 		"sec-ch-ua-model":             {""},
-		"sec-ch-ua-platform":          {`"Windows"`},
 		"sec-fetch-dest":              {"document"},
 		"sec-fetch-mode":              {"navigate"},
 		"sec-fetch-site":              {"none"},
@@ -89,13 +92,10 @@ func (f *Footlocker) GetHome(task shared.Task) (int, error) {
 			"accept",
 			"accept-encoding",
 			"accept-language",
-			"sec-ch-device-memory",
 			"sec-ch-ua",
-			"sec-ch-ua-arch",
 			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
 			"sec-ch-ua-model",
-			"sec-ch-ua-platform",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
@@ -108,16 +108,14 @@ func (f *Footlocker) GetHome(task shared.Task) (int, error) {
 	res, err := f.Client.Do(req)
 	if err != nil {
 		f.Log.Debug("Failed to GetHome response: ", err)
-		return 0, err
+		return 0, "", err
 	}
 
-	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
-		return f.GetHome(task)
-	}
+	cid := strings.Split(strings.Split(res.Header.Get("set-cookie"), ";")[0], "=")[1]
 
-	return res.StatusCode, nil
+	fmt.Println("cid: ", cid)
+
+	return res.StatusCode, cid, nil
 }
 
 func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
@@ -130,11 +128,8 @@ func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
 	req.Header = http.Header{
 		"authority":                   {"www.footlocker.com"},
 		"cache-control":               {"max-age=0"},
-		"sec-ch-device-memory":        {"8"},
 		"sec-ch-ua":                   {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
 		"sec-ch-ua-mobile":            {"?0"},
-		"sec-ch-ua-arch":              {`"x86"`},
-		"sec-ch-ua-platform":          {`"Windows"`},
 		"sec-ch-ua-model":             {""},
 		"sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
 		"upgrade-insecure-requests":   {"1"},
@@ -150,11 +145,8 @@ func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
 		http.HeaderOrderKey: {
 			"authority",
 			"cache-control",
-			"sec-ch-device-memory",
 			"sec-ch-ua",
 			"sec-ch-ua-mobile",
-			"sec-ch-ua-arch",
-			"sec-ch-ua-platform",
 			"sec-ch-ua-model",
 			"sec-ch-ua-full-version-list",
 			"upgrade-insecure-requests",
@@ -177,8 +169,8 @@ func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
 	}
 
 	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.GetProduct(task)
 	}
 
@@ -204,13 +196,10 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 		"accept-encoding":             {"gzip, deflate, br"},
 		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
 		"referer":                     {task.ProductURL},
-		"sec-ch-device-memory":        {"8"},
 		"sec-ch-ua":                   {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
-		"sec-ch-ua-arch":              {`"x86"`},
 		"sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
 		"sec-ch-ua-mobile":            {"?0"},
 		"sec-ch-ua-model":             {""},
-		"sec-ch-ua-platform":          {`"Windows"`},
 		"sec-fetch-dest":              {"empty"},
 		"sec-fetch-mode":              {"cors"},
 		"sec-fetch-site":              {"same-origin"},
@@ -222,13 +211,10 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 			"accept-encoding",
 			"accept-language",
 			"referer",
-			"sec-ch-device-memory",
 			"sec-ch-ua",
-			"sec-ch-ua-arch",
 			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
 			"sec-ch-ua-model",
-			"sec-ch-ua-platform",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
@@ -243,13 +229,13 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 		return 0, "", err
 	}
 
+	defer res.Body.Close()
+
 	if res.StatusCode != 200 {
-		p := f.Rotate()
-		f.Client.SetProxy(p)
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.TimeStamp(task)
 	}
-
-	defer res.Body.Close()
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -287,26 +273,26 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 	req.ContentLength = int64(len(json))
 
 	req.Header = http.Header{
-		"authority":       {"www.footlocker.com"},
-		"accept":          {"application/json"},
-		"accept-encoding": {"gzip, deflate, br"},
-		"accept-language": {"en-US,en;q=0.9,ar;q=0.8"},
-		"content-type":    {"application/json"},
-		"referer":         {"https://www.footlocker.com/"},
-		"cache-control":   {"no-cache"},
-		"sec-ch-ua":       {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
-		// "sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
-		"sec-ch-ua-mobile": {"?0"},
-		"sec-ch-ua-model":  {""},
-		"sec-fetch-dest":   {"empty"},
-		"sec-fetch-mode":   {"cors"},
-		"sec-fetch-site":   {"same-origin"},
-		"user-agent":       {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"},
-		"x-api-lang":       {"en-US"},
-		"x-api-country":    {"US"},
-		"x-fl-request-id":  {uuid.New().String()},
-		"x-fl-size":        {task.Size},
-		"x-fl-sku":         {task.Sku},
+		"authority":                   {"www.footlocker.com"},
+		"accept":                      {"application/json"},
+		"accept-encoding":             {"gzip, deflate, br"},
+		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
+		"content-type":                {"application/json"},
+		"referer":                     {"https://www.footlocker.com/"},
+		"cache-control":               {"no-cache"},
+		"sec-ch-ua":                   {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
+		"sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
+		"sec-ch-ua-mobile":            {"?0"},
+		"sec-ch-ua-model":             {""},
+		"sec-fetch-dest":              {"empty"},
+		"sec-fetch-mode":              {"cors"},
+		"sec-fetch-site":              {"same-origin"},
+		"user-agent":                  {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"},
+		"x-api-lang":                  {"en-US"},
+		"x-api-country":               {"US"},
+		"x-fl-request-id":             {uuid.New().String()},
+		"x-fl-size":                   {task.Size},
+		"x-fl-sku":                    {task.Sku},
 		http.HeaderOrderKey: {
 			"authority",
 			"accept",
@@ -317,7 +303,7 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 			"referer",
 			"cache-control",
 			"sec-ch-ua",
-			// "sec-ch-ua-full-version-list",
+			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
 			"sec-ch-ua-model",
 			"sec-fetch-dest",
@@ -338,10 +324,15 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
+	defer res.Body.Close()
 
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	body, _ := io.ReadAll(res.Body)
+
+	f.Log.Debug("ATC response: ", string(body))
+
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Proxy: ", f.Client.GetProxy())
 		return f.AddToCart(task)
 	}
 
@@ -370,7 +361,6 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 		"sec-ch-ua-full-version-list": {`"Google Chrome";v="113.0.5672.93", "Chromium";v="113.0.5672.93", "Not-A.Brand";v="24.0.0.0"`},
 		"sec-ch-ua-mobile":            {"?0"},
 		"sec-ch-ua-model":             {""},
-		"sec-ch-ua-platform":          {"Windows"},
 		"sec-fetch-dest":              {"empty"},
 		"sec-fetch-mode":              {"cors"},
 		"sec-fetch-site":              {"same-origin"},
@@ -386,7 +376,6 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
 			"sec-ch-ua-model",
-			"sec-ch-ua-platform",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
@@ -401,10 +390,9 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.GetCheckoutPage(task)
 	}
 
@@ -476,10 +464,9 @@ func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.SubmitUserInfo(task)
 	}
 
@@ -552,10 +539,9 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.AddAddress(task)
 	}
 
@@ -634,10 +620,9 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.VerifyAddress(task, csrfToken)
 	}
 
@@ -718,13 +703,11 @@ func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.SubmitVerifiedAddress(task)
 	}
-
 	return res.StatusCode, nil
 }
 
@@ -776,14 +759,13 @@ func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
 		return 0, "", err
 	}
 
-	proxy := f.Rotate()
+	defer res.Body.Close()
 
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
+	if res.StatusCode != 200 {
+		f.Flip()
+		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 		return f.GetAdyen(task)
 	}
-
-	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
@@ -798,7 +780,7 @@ func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
 	publicKeyRegex := regexp.MustCompile(`"adyenResponse":{"https://www.footlocker.com":"([\s\S]*?)"`)
 	publicKeyMatch := publicKeyRegex.FindStringSubmatch(htmlString)
 	if len(publicKeyMatch) > 0 {
-		fmt.Println("publicKey found")
+		f.Log.Debug("publicKey found: ", publicKey)
 		publicKey = publicKeyMatch[1]
 	}
 
@@ -864,13 +846,6 @@ func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
 		return 0, err
 	}
 
-	proxy := f.Rotate()
-
-	if res.StatusCode != 200 && proxy != "" {
-		f.Client.SetProxy(proxy)
-		return f.PlaceOrder(task)
-	}
-
 	return res.StatusCode, nil
 }
 
@@ -900,7 +875,7 @@ func (f *Footlocker) AdyenEncrypt(task shared.Task, publicKey string) (int, stri
 }
 
 func (f *Footlocker) Rotate() string {
-	newProxy := ProxyRotator(false)
+	newProxy := ProxyRotator(true)
 
 	if newProxy != " " {
 		return newProxy
@@ -911,49 +886,14 @@ func (f *Footlocker) Rotate() string {
 	return ""
 }
 
-func (f *Footlocker) GetDatadomeCookies(task shared.Task) (int, error) {
-	data := footlocker.DatadomePayload{
-		API_KEY:         "NSO-4233-5667-5920",
-		Data:            make(map[string]string),
-		Headers:         make(map[string]string),
-		Method:          "POST",
-		URL:             "http://ip-api.com/json/?fields=61439",
-		Hello_Client:    "HelloChrome_Auto",
-		Browser_Type:    "Chrome",
-		Cloudflare:      false,
-		Proxy:           f.Client.GetProxy(),
-		Cookies:         nil,
-		Allow_Redirects: false,
-	}
+func (f *Footlocker) Flip() string {
+	p := f.Rotate()
+	err := f.Client.SetProxy(p)
 
-	json, _ := json.Marshal(data)
-
-	req, err := http.NewRequest(http.MethodPost, "https://notsoldout.shop/requester_api", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue GetDatadomeCookies: ", err)
-		return 0, err
+		f.Log.Error("Proxy failed: ", err)
+
 	}
 
-	req.Header = http.Header{
-		"content-type": {"application/json"},
-		"apikey":       {"NSO-4233-5667-5920"},
-		"proxy":        {f.Client.GetProxy()},
-		"helloclient":  {"HelloChrome_Auto"},
-		"browsertype":  {"Chrome"},
-		http.HeaderOrderKey: {
-			"content-type",
-			"apikey",
-			"proxy",
-			"helloclient",
-			"browsertype",
-		},
-	}
-
-	res, err := f.Client.Do(req)
-	if err != nil {
-		f.Log.Debug("GetDatadomeCookies response error: ", err)
-		return 0, err
-	}
-
-	return res.StatusCode, nil
+	return "success"
 }

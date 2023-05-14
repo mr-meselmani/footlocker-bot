@@ -1,3 +1,4 @@
-http://10.10.1.10:3128
-https://11.11.1.11:8080
-http://12.12.1.12:3128
+http://mr71ueGI:MMU27m11wj_region-northamerica_session-961yjuz8@ultra.marsproxies.com:44443
+http://mr71ueGI:MMU27m11wj_region-northamerica_session-7s9gn7c7@ultra.marsproxies.com:44443
+http://mr71ueGI:MMU27m11wj_region-northamerica_session-80xtml5q@ultra.marsproxies.com:44443
+http://mr71ueGI:MMU27m11wj_region-northamerica_session-mpzr9g0m@ultra.marsproxies.com:44443
