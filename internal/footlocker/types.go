@@ -91,28 +91,34 @@ type VerifiedAddressPayload struct {
 }
 
 type PlaceOrderPayload struct {
-	Payment struct {
-		CcPaymentInfo struct {
-			EncryptedCardNumber   string `json:"encryptedCardNumber"`
-			EncryptedExpiryMonth  string `json:"encryptedExpiryMonth"`
-			EncryptedExpiryYear   string `json:"encryptedExpiryYear"`
-			EncryptedSecurityCode string `json:"encryptedSecurityCode"`
-			SavePayment           bool   `json:"savePayment"`
-		} `json:"ccPaymentInfo"`
-		BrowserInfo struct {
-			ScreenWidth    int    `json:"screenWidth"`
-			ScreenHeight   int    `json:"screenHeight"`
-			ColorDepth     int    `json:"colorDepth"`
-			UserAgent      string `json:"userAgent"`
-			TimeZoneOffset int    `json:"timeZoneOffset"`
-			Language       string `json:"language"`
-			JavaEnabled    bool   `json:"javaEnabled"`
-		} `json:"browserInfo"`
-	} `json:"payment"`
-	IsNoChargeOrder bool   `json:"isNoChargeOrder"`
-	CheckoutType    string `json:"checkoutType"`
-	OptIn           bool   `json:"optIn"`
-	DeviceID        string `json:"deviceId"`
+	Payment         PlaceOrderPayment `json:"payment"`
+	IsNoChargeOrder bool              `json:"isNoChargeOrder"`
+	CheckoutType    string            `json:"checkoutType"`
+	OptIn           bool              `json:"optIn"`
+	DeviceID        string            `json:"deviceId"`
+}
+
+type PlaceOrderPayment struct {
+	CcPaymentInfo PlaceOrderCcPaymentInfo `json:"ccPaymentInfo"`
+	BrowserInfo   PlaceOrderBrowserInfo   `json:"browserInfo"`
+}
+
+type PlaceOrderCcPaymentInfo struct {
+	EncryptedCardNumber   string `json:"encryptedCardNumber"`
+	EncryptedExpiryMonth  string `json:"encryptedExpiryMonth"`
+	EncryptedExpiryYear   string `json:"encryptedExpiryYear"`
+	EncryptedSecurityCode string `json:"encryptedSecurityCode"`
+	SavePayment           bool   `json:"savePayment"`
+}
+
+type PlaceOrderBrowserInfo struct {
+	ScreenWidth    int    `json:"screenWidth"`
+	ScreenHeight   int    `json:"screenHeight"`
+	ColorDepth     int    `json:"colorDepth"`
+	UserAgent      string `json:"userAgent"`
+	TimeZoneOffset int    `json:"timeZoneOffset"`
+	Language       string `json:"language"`
+	JavaEnabled    bool   `json:"javaEnabled"`
 }
 
 type DatadomePayload struct {
@@ -127,4 +133,17 @@ type DatadomePayload struct {
 	Proxy           string            `json:proxy`
 	Cookies         []*http.Cookie    `json:cookies`
 	Allow_Redirects bool              `json:allowRedirects`
+}
+
+type GetAdyenRes struct {
+	OKey          string                        `json:"oKey"`
+	AdyenResponse GetAdyenHTTPSWwwFootlockerCom `json:"adyenResponse"`
+}
+
+type GetAdyenHTTPSWwwFootlockerCom struct {
+	HTTPSWwwFootlockerCom string `json:"https://www.footlocker.com"`
+}
+
+type LocationLokkupPayload struct {
+	ZipCode string `json:"zipCode"`
 }

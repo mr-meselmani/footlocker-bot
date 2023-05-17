@@ -1,51 +1,50 @@
 package main
 
 import (
-	"fmt"
 	"footlocker-bot/internal"
 	"footlocker-bot/internal/logger"
 	"footlocker-bot/internal/shared"
-	"time"
 )
 
 func main() {
 	l := logger.NewLogger()
 	footlocker := internal.NewFootlockerBot()
-	dd := internal.NewDatadome()
+
 	l.EnableDebug()
 
 	task := shared.Task{
-		ProfileName: "ASM",
-		ProductURL:  "https://www.footlocker.com/product/~/7895HMBC.html",
-		Size:        "10.0",
-		ProductID:   "270963",
-		Quantity:    1,
-		UseProxy:    false,
-		Mode:        "",
-		Aco:         false,
-		Region:      "NM",
-		Store:       "",
-		Keywords:    "",
-		Sku:         "7895HMBC",
-		Payment:     "",
+		ProfileName:   "ASM",
+		ProductURL:    "https://www.footlocker.com/product/~/38019001.html",
+		Size:          "10.0",
+		ProductID:     "",
+		Quantity:      1,
+		UseProxy:      false,
+		Mode:          "",
+		Aco:           false,
+		Region:        "NY",
+		RegionIsocode: "US-NY",
+		Store:         "",
+		Keywords:      "",
+		Sku:           "37581101",
+		Payment:       "",
 		Profile: shared.Profile{
 			ProfileName: "ASM Profile",
-			FirstName:   "Peter",
-			LastName:    "Valaxar",
-			Age:         22,
-			BirthDay:    29,
-			BirthMonth:  3,
-			BirthYear:   2000,
-			Gender:      "m",
+			FirstName:   "ASM",
+			LastName:    "DEV",
+			Age:         1,
+			BirthDay:    1,
+			BirthMonth:  1,
+			BirthYear:   1,
+			Gender:      "",
 			Email:       "asm.dev29@gmail.com",
 			Phone:       "2025961737",
-			Address:     "S Santa Monica St",
-			Address2:    "1721",
-			Zip:         "88030",
-			City:        "DEMING",
-			Country:     "United Kingdom",
+			Address:     "83 Pendergast Street",
+			Address2:    "",
+			Zip:         "11225",
+			City:        "BROOKLYN",
+			Country:     "",
 			CountryISO:  "US",
-			CountryCode: "GBR",
+			CountryCode: "",
 			State:       "",
 			Cardname:    "Kai Avila",
 			Cnb:         "4109703255583065",
@@ -53,7 +52,7 @@ func main() {
 			Year:        "2027",
 			Cvv:         "340",
 			CardType:    "visa",
-			Password:    "Tv@Tv80",
+			Password:    "",
 		},
 		Id: 0,
 	}
@@ -72,48 +71,67 @@ func main() {
 	footlocker.Log.Info("GetHomeStatus: ", GetHomeStatus)
 	footlocker.Log.Info("cid: ", cid)
 
-	time.Sleep(1 * time.Second)
+	// GetProduct
+	GetProductStatus, _ := footlocker.GetProduct(task, cid)
+	footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
 
-	// gen dd cookies
-	getCookiesStatus, _ := dd.GenCh(cid)
-	fmt.Println("getcookies: ", getCookiesStatus)
+	// TimeStamp
+	TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task, cid)
+	footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
+	footlocker.Log.Debug("csrfToken: ", csrfToken)
 
-	// // GetProduct
-	// GetProductStatus, _ := footlocker.GetProduct(task)
-	// footlocker.Log.Info("GetProductStatus: ", GetProductStatus)
+	// AddToCart
+	AddToCartStatus, _ := footlocker.AddToCart(task, cid)
+	footlocker.Log.Info("ATC Status: ", AddToCartStatus)
 
-	// // TimeStamp
-	// TimeStampStatus, csrfToken, _ := footlocker.TimeStamp(task)
-	// footlocker.Log.Info("TimeStampStatus: ", TimeStampStatus)
-	// footlocker.Log.Debug("csrfToken: ", csrfToken)
+	// GetCheckoutpgae
+	GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task, cid)
+	footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
 
-	// // AddToCart
-	// AddToCartStatus, _ := footlocker.AddToCart(task)
-	// footlocker.Log.Info("ATC Status: ", AddToCartStatus)
+	// SubmitUserInfo
+	SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task, cid)
+	footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
 
-	// // GetCheckoutpgae
-	// GetCheckoutPageStatus, _ := footlocker.GetCheckoutPage(task)
-	// footlocker.Log.Info("GetCheckoutPageStatus: ", GetCheckoutPageStatus)
+	// LocationLookup
+	LocationLookupStatus, _ := footlocker.LocationLookup(task, cid)
+	footlocker.Log.Info("LocationLookupStatus: ", LocationLookupStatus)
 
-	// // SubmitUserInfo
-	// SubmitUserInfoStatus, _ := footlocker.SubmitUserInfo(task)
-	// footlocker.Log.Info("SubmitUserInfoStatus: ", SubmitUserInfoStatus)
+	// AddAddress
+	AddAddressStatus, _ := footlocker.AddAddress(task, cid)
+	footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
 
-	// // AddAddress
-	// AddAddressStatus, _ := footlocker.AddAddress(task)
-	// footlocker.Log.Info("AddAddressStatus: ", AddAddressStatus)
+	// VerifyAddress
+	VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken, cid)
+	footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
 
-	// // VerifyAddress
-	// VerifyAddressStatus, _ := footlocker.VerifyAddress(task, csrfToken)
-	// footlocker.Log.Info("VerifyAddressStatus: ", VerifyAddressStatus)
+	// SubmitVerifiedAddress
+	SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task, cid)
+	footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
 
-	// // SubmitVerifiedAddress
-	// SubmitVerifiedAddressStatus, _ := footlocker.SubmitVerifiedAddress(task)
-	// footlocker.Log.Info("SubmitVerifiedAddressStatus: ", SubmitVerifiedAddressStatus)
+	// GetAdyenPublicKey
+	GetAdyenPublicKeyStatus, publicKey, dQuery, _ := footlocker.GetAdyenPublicKey(task, cid)
+	footlocker.Log.Info("GetAdyenPublicKeyStatus: ", GetAdyenPublicKeyStatus)
+	footlocker.Log.Info("publicKey: ", publicKey)
 
-	// // GetAdyen
-	// GetAdyenStatus, publicKey, _ := footlocker.GetAdyen(task)
-	// footlocker.Log.Info("GetAdyenStatus: ", GetAdyenStatus)
-	// footlocker.Log.Info("publicKey: ", publicKey)
+	// GetAdyenEncryption
+	GetAdyenEncryptionStatus, encryptionKey, _ := footlocker.GetAdyenEncryptionKey(task, cid, publicKey, dQuery)
+	footlocker.Log.Info("GetAdyenEncryptionStatus: ", GetAdyenEncryptionStatus)
+	footlocker.Log.Info("encryptionKey: ", encryptionKey)
+
+	// Adyen Encryption
+	AdyenEncryptStatus, encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedSecurityCode, _ := footlocker.AdyenEncrypt(task, encryptionKey)
+	footlocker.Log.Info("Adyen Encryption Status: ", AdyenEncryptStatus)
+	footlocker.Log.Debug("encryptedCardNumber: ", encryptedCardNumber)
+	footlocker.Log.Debug("encryptedExpiryMonth: ", encryptedExpiryMonth)
+	footlocker.Log.Debug("encryptedExpiryYear: ", encryptedExpiryYear)
+	footlocker.Log.Debug("encryptedSecurityCode: ", encryptedSecurityCode)
+
+	if AdyenEncryptStatus != 200 {
+		return
+	}
+
+	// PlaceOrder
+	PlaceOrderStatus, _ := footlocker.PlaceOrder(task, encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedSecurityCode, cid)
+	footlocker.Log.Info("PlaceOrderStatus: ", PlaceOrderStatus)
 
 }

@@ -27,21 +27,22 @@ type Product struct {
 }
 
 type Task struct {
-	ProfileName string
-	ProductURL  string
-	Size        string
-	ProductID   string
-	Quantity    int
-	UseProxy    bool
-	Mode        string
-	Aco         bool
-	Region      string
-	Store       string
-	Keywords    string
-	Sku         string
-	Payment     string
-	Profile     Profile
-	Id          int
+	ProfileName   string
+	ProductURL    string
+	Size          string
+	ProductID     string
+	Quantity      int
+	UseProxy      bool
+	Mode          string
+	Aco           bool
+	Region        string
+	RegionIsocode string
+	Store         string
+	Keywords      string
+	Sku           string
+	Payment       string
+	Profile       Profile
+	Id            int
 }
 
 type Profile struct {

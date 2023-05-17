@@ -1,5 +1,16 @@
 package datadome
 
+type DDresponse struct {
+	Status int    `json:"status"`
+	Cookie string `json:"cookie"`
+}
+
+type DDApiPaylpoad struct {
+	Proxy  string `json:"Proxy"`
+	Origin string `json:"Origin"`
+	Ddk    string `json:"Ddk"`
+}
+
 type GenChPayload struct {
 	Ttst     float64 `json:"ttst"`
 	Ifov     bool    `json:"ifov"`

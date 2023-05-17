@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"footlocker-bot/internal/logger"
 	"footlocker-bot/internal/shared"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -24,7 +24,7 @@ import (
 type Footlocker struct {
 	Client tls_client.HttpClient
 	Log    logger.Logger
-	Ctx    context.Context
+	DD     Datadome
 }
 
 func NewFootlockerBot() Footlocker {
@@ -44,7 +44,7 @@ func (f *Footlocker) GetFootlockerSettings(settings shared.Settings) error {
 		tls_client.WithClientProfile(tls_client.Chrome_112),
 		tls_client.WithNotFollowRedirects(),
 		tls_client.WithCookieJar(jar),
-		tls_client.WithProxyUrl("http://127.0.0.1:8888"),
+		// tls_client.WithProxyUrl("http://127.0.0.1:8888"),
 	}
 
 	client, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
@@ -56,19 +56,22 @@ func (f *Footlocker) GetFootlockerSettings(settings shared.Settings) error {
 
 	f.Log.EnableDebug()
 
+	f.DD = NewDatadome()
+
 	f.Client = client
+
+	newProxy := f.Flip()
+	f.Client.SetProxy(newProxy)
 
 	return nil
 }
 
 // Requests
 func (f *Footlocker) GetHome(task shared.Task) (int, string, error) {
-	// f.Flip()
-	// f.Log.Debug("Current proxy: ", f.Client.GetProxy())
 
 	req, err := http.NewRequest(http.MethodGet, "https://www.footlocker.com/", nil)
 	if err != nil {
-		f.Log.Debug("Failed to issue GetHome request: ", err)
+		f.Log.Error("Failed to issue GetHome request: ", err)
 		return 0, "", err
 	}
 
@@ -107,21 +110,28 @@ func (f *Footlocker) GetHome(task shared.Task) (int, string, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("Failed to GetHome response: ", err)
+		f.Log.Error("Failed to GetHome response: ", err)
 		return 0, "", err
 	}
 
-	cid := strings.Split(strings.Split(res.Header.Get("set-cookie"), ";")[0], "=")[1]
+	if res.StatusCode != 200 {
+		newProxy := f.Flip()
+		f.Client.SetProxy(newProxy)
+		f.Log.Warning("GetHomeStatus: ", res.StatusCode)
+		return f.GetHome(task)
+	}
 
-	fmt.Println("cid: ", cid)
+	defer res.Body.Close()
+
+	cid := strings.Split(strings.Split(res.Header.Get("set-cookie"), ";")[0], "=")[1]
 
 	return res.StatusCode, cid, nil
 }
 
-func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
+func (f *Footlocker) GetProduct(task shared.Task, cid string) (int, error) {
 	req, err := http.NewRequest(http.MethodGet, task.ProductURL, nil)
 	if err != nil {
-		f.Log.Debug("Failed to issue GetProduct request: ", err)
+		f.Log.Error("Failed to issue GetProduct request: ", err)
 		return 0, err
 	}
 
@@ -164,20 +174,41 @@ func (f *Footlocker) GetProduct(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("GetProduct response error: ", err)
+		f.Log.Error("GetProduct response error: ", err)
 		return 0, err
 	}
 
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.GetProduct(task)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		return f.GetProduct(task, cid)
 	}
+
+	defer res.Body.Close()
 
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
+func (f *Footlocker) TimeStamp(task shared.Task, cid string) (int, string, error) {
 	// Get the current time
 	currentTime := time.Now()
 
@@ -186,7 +217,7 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://www.footlocker.com/zgw/session?timestamp=%d", timestamp), nil)
 	if err != nil {
-		f.Log.Debug("Failed to issue TimeStamp request: ", err)
+		f.Log.Error("Failed to issue TimeStamp request: ", err)
 		return 0, "", err
 	}
 
@@ -225,22 +256,41 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("TimeStamp response error: ", err)
+		f.Log.Error("TimeStamp response error: ", err)
 		return 0, "", err
+	}
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("TimeStamp: ", res.StatusCode)
+
+		return f.TimeStamp(task, cid)
 	}
 
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.TimeStamp(task)
-	}
-
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		return 0, "", nil
-	}
+	b, _ := io.ReadAll(res.Body)
 
 	var Data footlocker.TimestampResponse
 	err = json.Unmarshal(b, &Data)
@@ -253,7 +303,7 @@ func (f *Footlocker) TimeStamp(task shared.Task) (int, string, error) {
 	return res.StatusCode, csrfToken, nil
 }
 
-func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
+func (f *Footlocker) AddToCart(task shared.Task, cid string) (int, error) {
 	data := footlocker.AddToCartPayload{
 		Size:            task.Size,
 		Sku:             task.Sku,
@@ -266,33 +316,31 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 
 	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/cartItems/addCartItem", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue AddToCart request: ", err)
+		f.Log.Error("Failed to issue AddToCart request: ", err)
 		return 0, err
 	}
 
 	req.ContentLength = int64(len(json))
 
 	req.Header = http.Header{
-		"authority":                   {"www.footlocker.com"},
-		"accept":                      {"application/json"},
-		"accept-encoding":             {"gzip, deflate, br"},
-		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
-		"content-type":                {"application/json"},
-		"referer":                     {"https://www.footlocker.com/"},
-		"cache-control":               {"no-cache"},
-		"sec-ch-ua":                   {`"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"`},
-		"sec-ch-ua-full-version-list": {`"Chromium";v="112.0.5615.138", "Google Chrome";v="112.0.5615.138", "Not:A-Brand";v="99.0.0.0"`},
-		"sec-ch-ua-mobile":            {"?0"},
-		"sec-ch-ua-model":             {""},
-		"sec-fetch-dest":              {"empty"},
-		"sec-fetch-mode":              {"cors"},
-		"sec-fetch-site":              {"same-origin"},
-		"user-agent":                  {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"},
-		"x-api-lang":                  {"en-US"},
-		"x-api-country":               {"US"},
-		"x-fl-request-id":             {uuid.New().String()},
-		"x-fl-size":                   {task.Size},
-		"x-fl-sku":                    {task.Sku},
+		"authority":          {"www.footlocker.com"},
+		"accept":             {"application/json"},
+		"accept-encoding":    {"gzip, deflate, br"},
+		"accept-language":    {"en-US,en;q=0.9"},
+		"content-type":       {"application/json"},
+		"origin":             {"https://www.footlocker.com"},
+		"referer":            {task.ProductURL},
+		"sec-ch-ua":          {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
+		"sec-ch-ua-mobile":   {"?0"},
+		"sec-ch-ua-platform": {`"Windows"`},
+		"sec-fetch-dest":     {"empty"},
+		"sec-fetch-mode":     {"cors"},
+		"sec-fetch-site":     {"same-origin"},
+		"user-agent":         {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
+		"x-api-lang":         {"en"},
+		"x-fl-request-id":    {uuid.New().String()},
+		"x-fl-size":          {"10.0"},
+		"x-fl-sku":           {task.Sku},
 		http.HeaderOrderKey: {
 			"authority",
 			"accept",
@@ -300,18 +348,16 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 			"accept-language",
 			"content-length",
 			"content-type",
+			"origin",
 			"referer",
-			"cache-control",
 			"sec-ch-ua",
-			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
-			"sec-ch-ua-model",
+			"sec-ch-ua-platform",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
 			"user-agent",
 			"x-api-lang",
-			"x-api-country",
 			"x-fl-request-id",
 			"x-fl-size",
 			"x-fl-sku",
@@ -320,8 +366,35 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("AddToCart response error: ", err)
+		f.Log.Error("AddToCart response error: ", err)
 		return 0, err
+	}
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("AddToCartStatus: ", res.StatusCode)
+
+		return f.AddToCart(task, cid)
 	}
 
 	defer res.Body.Close()
@@ -330,16 +403,10 @@ func (f *Footlocker) AddToCart(task shared.Task) (int, error) {
 
 	f.Log.Debug("ATC response: ", string(body))
 
-	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Proxy: ", f.Client.GetProxy())
-		return f.AddToCart(task)
-	}
-
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
+func (f *Footlocker) GetCheckoutPage(task shared.Task, cid string) (int, error) {
 	// Get the current time
 	currentTime := time.Now()
 
@@ -347,7 +414,7 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 	timestamp := currentTime.UnixNano() / int64(time.Millisecond)
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://www.footlocker.com/api/pages/en/checkout.page.mainpage.json?timestamp=%d", timestamp), nil)
 	if err != nil {
-		f.Log.Debug("Failed to issue GetCheckoutPage request: ", err)
+		f.Log.Error("Failed to issue GetCheckoutPage request: ", err)
 		return 0, err
 	}
 
@@ -386,20 +453,43 @@ func (f *Footlocker) GetCheckoutPage(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("GetCheckoutPage response error: ", err)
+		f.Log.Error("GetCheckoutPage response error: ", err)
 		return 0, err
 	}
 
+	defer res.Body.Close()
+
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.GetCheckoutPage(task)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("GetCheckoutPage: ", res.StatusCode)
+
+		return f.GetCheckoutPage(task, cid)
 	}
 
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
+func (f *Footlocker) SubmitUserInfo(task shared.Task, cid string) (int, error) {
 	data := footlocker.SubmitUserInfoPayload{
 		FirstName:    task.Profile.FirstName,
 		LastName:     task.Profile.LastName,
@@ -412,7 +502,7 @@ func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
 
 	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/userInfo", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue SubmitUserInfo request: ", err)
+		f.Log.Error("Failed to issue SubmitUserInfo request: ", err)
 		return 0, err
 	}
 
@@ -460,20 +550,132 @@ func (f *Footlocker) SubmitUserInfo(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("SubmitUserInfo response error: ", err)
+		f.Log.Error("SubmitUserInfo response error: ", err)
 		return 0, err
 	}
 
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.SubmitUserInfo(task)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("AddToCartStatus: ", res.StatusCode)
+
+		return f.SubmitUserInfo(task, cid)
 	}
+
+	defer res.Body.Close()
 
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
+func (f *Footlocker) LocationLookup(task shared.Task, cid string) (int, error) {
+	data := footlocker.LocationLokkupPayload{
+		ZipCode: task.Region + " " + task.Profile.Zip,
+	}
+
+	j, _ := json.Marshal(data)
+
+	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/api/satori/location-lookup/", bytes.NewBuffer(j))
+	if err != nil {
+		f.Log.Error("Failed to issue LocationLokkup request: ", err)
+		return 0, err
+	}
+
+	req.Header = http.Header{
+		"authority":        {"www.footlocker.com"},
+		"sec-ch-ua":        {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
+		"x-api-lang":       {"en"},
+		"sec-ch-ua-mobile": {"?0"},
+		"user-agent":       {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
+		"content-type":     {"application/json"},
+		"accept":           {"application/json"},
+		"x-fl-request-id":  {uuid.New().String()},
+		"origin":           {"https://www.footlocker.com"},
+		"sec-fetch-site":   {"same-origin"},
+		"sec-fetch-mode":   {"cors"},
+		"sec-fetch-dest":   {"empty"},
+		"referer":          {"https://www.footlocker.com/checkout"},
+		"accept-encoding":  {"gzip, deflate, br"},
+		"accept-language":  {"en-US,en;q=0.9"},
+		http.HeaderOrderKey: {
+			"authority",
+			"content-length",
+			"sec-ch-ua",
+			"x-api-lang",
+			"sec-ch-ua-mobile",
+			"user-agent",
+			"content-type",
+			"accept",
+			"x-fl-request-id",
+			"origin",
+			"sec-fetch-site",
+			"sec-fetch-mode",
+			"sec-fetch-dest",
+			"referer",
+			"accept-encoding",
+			"accept-language",
+		},
+	}
+
+	res, err := f.Client.Do(req)
+	if err != nil {
+		f.Log.Error("Failed to issue LocationLookup request: ", err)
+		return 0, err
+	}
+
+	// body, _ := io.ReadAll(res.Body)
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("LocationLookup: ", res.StatusCode)
+
+		return f.LocationLookup(task, cid)
+	}
+
+	defer res.Body.Close()
+
+	return res.StatusCode, nil
+}
+
+func (f *Footlocker) AddAddress(task shared.Task, cid string) (int, error) {
 	data := footlocker.AddAddressPayload{
 		CountryIsocode:     task.Profile.CountryISO,
 		City:               task.Profile.City,
@@ -487,30 +689,28 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 
 	req, err := http.NewRequest(http.MethodGet, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/address", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue AddAddress request: ", err)
+		f.Log.Error("Failed to issue AddAddress request: ", err)
 		return 0, err
 	}
 
 	req.ContentLength = int64(len(json))
 
 	req.Header = http.Header{
-		"authority":                   {"www.footlocker.com"},
-		"accept":                      {"application/json"},
-		"accept-encoding":             {"gzip, deflate, br"},
-		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
-		"content-type":                {"application/json"},
-		"referer":                     {"https://www.footlocker.com/checkout"},
-		"cache-control":               {"no-cache"},
-		"sec-ch-ua":                   {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
-		"sec-ch-ua-full-version-list": {`"Google Chrome";v="113.0.5672.93", "Chromium";v="113.0.5672.93", "Not-A.Brand";v="24.0.0.0"`},
-		"sec-ch-ua-mobile":            {"?0"},
-		"sec-ch-ua-model":             {""},
-		"sec-fetch-dest":              {"empty"},
-		"sec-fetch-mode":              {"cors"},
-		"sec-fetch-site":              {"same-origin"},
-		"user-agent":                  {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
-		"x-api-lang":                  {"en"},
-		"x-fl-request-id":             {uuid.New().String()},
+		"authority":        {"www.footlocker.com"},
+		"accept":           {"application/json"},
+		"accept-encoding":  {"gzip, deflate, br"},
+		"accept-language":  {"en-US,en;q=0.9"},
+		"content-type":     {"application/json"},
+		"origin":           {"https://www.footlocker.com"},
+		"referer":          {"https://www.footlocker.com/checkout"},
+		"sec-ch-ua":        {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
+		"sec-ch-ua-mobile": {"?0"},
+		"sec-fetch-dest":   {"empty"},
+		"sec-fetch-mode":   {"cors"},
+		"sec-fetch-site":   {"same-origin"},
+		"user-agent":       {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
+		"x-api-lang":       {"en"},
+		"x-fl-request-id":  {uuid.New().String()},
 		http.HeaderOrderKey: {
 			"authority",
 			"accept",
@@ -518,12 +718,10 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 			"accept-language",
 			"content-length",
 			"content-type",
+			"origin",
 			"referer",
-			"cache-control",
 			"sec-ch-ua",
-			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
-			"sec-ch-ua-model",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
@@ -535,20 +733,43 @@ func (f *Footlocker) AddAddress(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("AddAddress response error: ", err)
+		f.Log.Error("AddAddress response error: ", err)
 		return 0, err
 	}
 
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.AddAddress(task)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("AddAddress: ", res.StatusCode)
+
+		return f.AddAddress(task, cid)
 	}
+
+	defer res.Body.Close()
 
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, error) {
+func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string, cid string) (int, error) {
 	data := footlocker.VerifyAddressPayload{
 		Country: footlocker.VerifyAddressCountry{
 			Isocode: task.Profile.CountryISO,
@@ -557,7 +778,7 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 			IsocodeShort: task.Region,
 		},
 		Line1:      task.Profile.Address,
-		Line2:      task.Profile.Address2,
+		Line2:      "",
 		PostalCode: task.Profile.Zip,
 		Town:       task.Profile.City,
 	}
@@ -566,7 +787,7 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 
 	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/api/users/addresses/verification", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue VerifyAddress request: ", err)
+		f.Log.Error("Failed to issue VerifyAddress request: ", err)
 		return 0, err
 	}
 
@@ -579,7 +800,6 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
 		"content-type":                {"application/json"},
 		"referer":                     {"https://www.footlocker.com/checkout"},
-		"cache-control":               {"no-cache"},
 		"sec-ch-ua":                   {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
 		"sec-ch-ua-full-version-list": {`"Google Chrome";v="113.0.5672.93", "Chromium";v="113.0.5672.93", "Not-A.Brand";v="24.0.0.0"`},
 		"sec-ch-ua-mobile":            {"?0"},
@@ -599,7 +819,6 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 			"content-length",
 			"content-type",
 			"referer",
-			"cache-control",
 			"sec-ch-ua",
 			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
@@ -616,32 +835,55 @@ func (f *Footlocker) VerifyAddress(task shared.Task, csrfToken string) (int, err
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("VerifyAddress response error: ", err)
+		f.Log.Error("VerifyAddress response error: ", err)
 		return 0, err
 	}
 
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.VerifyAddress(task, csrfToken)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("VerifyAddress: ", res.StatusCode)
+
+		return f.VerifyAddress(task, csrfToken, cid)
 	}
+
+	defer res.Body.Close()
 
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
+func (f *Footlocker) SubmitVerifiedAddress(task shared.Task, cid string) (int, error) {
 	data := footlocker.VerifiedAddressPayload{
 		CountryIsocode:     task.Profile.CountryISO,
 		FirstName:          task.Profile.FirstName,
 		LastName:           task.Profile.LastName,
 		Line1:              task.Profile.Address,
-		Line2:              task.Profile.Address2,
+		Line2:              "",
 		PostalCode:         task.Profile.Zip,
 		City:               task.Profile.City,
-		RegionIsocodeShort: task.Profile.CountryISO,
+		RegionIsocodeShort: task.Region,
 		IsBilling:          true,
 		IsShipping:         true,
-		RegionIsocode:      task.Region,
+		RegionIsocode:      task.RegionIsocode,
 		Phone:              task.Profile.Phone,
 		AddressType:        " ",
 		Residential:        false,
@@ -651,7 +893,7 @@ func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
 
 	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/address", bytes.NewBuffer(json))
 	if err != nil {
-		f.Log.Debug("Failed to issue SubmitVerifiedAddress request: ", err)
+		f.Log.Error("Failed to issue SubmitVerifiedAddress request: ", err)
 		return 0, err
 	}
 
@@ -699,23 +941,47 @@ func (f *Footlocker) SubmitVerifiedAddress(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("SubmitVerifiedAddress response error: ", err)
+		f.Log.Error("SubmitVerifiedAddress response error: ", err)
 		return 0, err
 	}
 
+	domain := req.URL
+
 	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.SubmitVerifiedAddress(task)
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("SubmitVerifiedAddress: ", res.StatusCode)
+
+		return f.SubmitVerifiedAddress(task, cid)
 	}
+
+	defer res.Body.Close()
+
 	return res.StatusCode, nil
 }
 
-func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
+func (f *Footlocker) GetAdyenPublicKey(task shared.Task, cid string) (int, string, string, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://www.footlocker.com/apigate/payment/origin-key", nil)
 	if err != nil {
-		f.Log.Debug("Failed to issue GetAdyen request: ", err)
-		return 0, "", err
+		f.Log.Error("Failed to issue GetAdyen request: ", err)
+		return 0, "", "", err
 	}
 
 	req.Header = http.Header{
@@ -755,67 +1021,205 @@ func (f *Footlocker) GetAdyen(task shared.Task) (int, string, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("GetAdyen response error: ", err)
-		return 0, "", err
+		f.Log.Error("GetAdyen response error: ", err)
+		return 0, "", "", err
+	}
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("GetAdyen: ", res.StatusCode)
+
+		return f.GetAdyenPublicKey(task, cid)
 	}
 
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
-		f.Flip()
-		f.Log.Debug("Current proxy: ", f.Client.GetProxy())
-		return f.GetAdyen(task)
+	body, _ := io.ReadAll(res.Body)
+
+	var resData footlocker.GetAdyenRes
+	err = json.Unmarshal(body, &resData)
+
+	if err != nil {
+		f.Log.Error("GetAdyen unmarshal data error: ", err)
+		return 0, "", "", err
 	}
+
+	dQuery := strings.Split(resData.OKey, ".")[3]
+
+	return res.StatusCode, resData.OKey, dQuery, nil
+}
+
+func (f *Footlocker) GetAdyenEncryptionKey(task shared.Task, cid string, publicKey string, dQuery string) (int, string, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://checkoutshopper-live.adyen.com/checkoutshopper/securedfields/%s/3.3.1/securedFields.html?type=card&d=%s%3D", publicKey, dQuery), nil)
+	if err != nil {
+		f.Log.Error("Failed to issue GetAdyenEncryptionKey request: ", err)
+		return 0, "", err
+	}
+
+	req.Header = http.Header{
+		"Host":                      {"checkoutshopper-live.adyen.com"},
+		"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"},
+		"Accept-Encoding":           {"gzip, deflate, br"},
+		"Accept-Language":           {"en-US,en;q=0.9"},
+		"Connection":                {"keep-alive"},
+		"Referer":                   {"https://www.footlocker.com/"},
+		"Sec-Fetch-Dest":            {"iframe"},
+		"Sec-Fetch-Mode":            {"navigate"},
+		"Sec-Fetch-Site":            {"cross-site"},
+		"Sec-Fetch-User":            {"?1"},
+		"Upgrade-Insecure-Requests": {"1"},
+		"User-Agent":                {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
+		"sec-ch-ua":                 {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
+		"sec-ch-ua-mobile":          {"?0"},
+		"sec-ch-ua-platform":        {`"Windows"`},
+		http.HeaderOrderKey: {
+			"Host",
+			"Accept",
+			"Accept-Encoding",
+			"Accept-Language",
+			"Connection",
+			"Referer",
+			"Sec-Fetch-Dest",
+			"Sec-Fetch-Mode",
+			"Sec-Fetch-Site",
+			"Sec-Fetch-User",
+			"Upgrade-Insecure-Requests",
+			"User-Agent",
+			"sec-ch-ua",
+			"sec-ch-ua-mobile",
+			"sec-ch-ua-platform",
+		},
+	}
+
+	res, err := f.Client.Do(req)
+	if err != nil {
+		f.Log.Error("GetAdyenEncryptionKey response error: ", err)
+		return 0, "", err
+	}
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("GetAdyenEncryptionKey: ", res.StatusCode)
+
+		return f.GetAdyenEncryptionKey(task, cid, publicKey, dQuery)
+	}
+
+	defer res.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
+		f.Log.Error("Failed to read GetAdyenEncryptionKey doc: ", err)
 		return 0, "", err
+
 	}
 
 	htmlString, _ := doc.Html()
 
-	var publicKey string
+	var encryptionKey string
 
 	// public key
-	publicKeyRegex := regexp.MustCompile(`"adyenResponse":{"https://www.footlocker.com":"([\s\S]*?)"`)
-	publicKeyMatch := publicKeyRegex.FindStringSubmatch(htmlString)
-	if len(publicKeyMatch) > 0 {
-		f.Log.Debug("publicKey found: ", publicKey)
-		publicKey = publicKeyMatch[1]
+	encryptionKeyRegex := regexp.MustCompile(`var key = "([\s\S]*?)";`)
+	encryptionKeyMatch := encryptionKeyRegex.FindStringSubmatch(htmlString)
+	if len(encryptionKeyMatch) > 0 {
+		f.Log.Debug("encryptionKey found", "")
+		encryptionKey = encryptionKeyMatch[1]
 	}
 
-	f.Log.Debug("Publickey: ", publicKey)
-
-	return res.StatusCode, publicKey, nil
+	return res.StatusCode, encryptionKey, nil
 }
 
-func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
-	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/placeOrder", nil)
+func (f *Footlocker) PlaceOrder(task shared.Task, encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedSecurityCode, cid string) (int, error) {
+	payload := footlocker.PlaceOrderPayload{
+		Payment: footlocker.PlaceOrderPayment{
+			CcPaymentInfo: footlocker.PlaceOrderCcPaymentInfo{
+				EncryptedCardNumber:   encryptedCardNumber,
+				EncryptedExpiryMonth:  encryptedExpiryMonth,
+				EncryptedExpiryYear:   encryptedExpiryYear,
+				EncryptedSecurityCode: encryptedSecurityCode,
+				SavePayment:           false,
+			},
+			BrowserInfo: footlocker.PlaceOrderBrowserInfo{
+				ScreenWidth:    1536,
+				ScreenHeight:   864,
+				ColorDepth:     24,
+				UserAgent:      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
+				TimeZoneOffset: -180,
+				Language:       "en-US",
+				JavaEnabled:    false,
+			},
+		},
+		IsNoChargeOrder: false,
+		CheckoutType:    "NORMAL",
+		OptIn:           false,
+		DeviceID:        "",
+	}
+
+	j, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest(http.MethodPost, "https://www.footlocker.com/zgw/carts/co-cart-aggregation-service/site/fl/cart/placeOrder", bytes.NewBuffer(j))
 	if err != nil {
-		f.Log.Debug("Failed to issue PlaceOrder request: ", err)
+		f.Log.Error("Failed to issue PlaceOrder request: ", err)
 		return 0, err
 	}
 
 	req.Header = http.Header{
-		"authority":                   {"www.footlocker.com"},
-		"accept":                      {"application/json"},
-		"accept-encoding":             {"gzip, deflate, br"},
-		"accept-language":             {"en-US,en;q=0.9,ar;q=0.8"},
-		"content-type":                {"application/json"},
-		"referer":                     {"https://www.footlocker.com/checkout"},
-		"cache-control":               {"no-cache"},
-		"sec-ch-ua":                   {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
-		"sec-ch-ua-full-version-list": {`"Google Chrome";v="113.0.5672.93", "Chromium";v="113.0.5672.93", "Not-A.Brand";v="24.0.0.0"`},
-		"sec-ch-ua-mobile":            {"?0"},
-		"sec-ch-ua-model":             {""},
-		"sec-fetch-dest":              {"empty"},
-		"sec-fetch-mode":              {"cors"},
-		"sec-fetch-site":              {"same-origin"},
-		"user-agent":                  {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
-		"x-api-lang":                  {"en"},
-		"x-fl-request-id":             {uuid.New().String()},
-		"x-flgw-channel-info":         {"WEB"},
-		"x-mobile-device":             {"false"},
+		"authority":           {"www.footlocker.com"},
+		"accept":              {"application/json"},
+		"accept-encoding":     {"gzip, deflate, br"},
+		"accept-language":     {"en-US,en;q=0.9"},
+		"content-type":        {"application/json"},
+		"origin":              {"https://www.footlocker.com"},
+		"referer":             {"https://www.footlocker.com/checkout"},
+		"sec-ch-ua":           {`"Google Chrome";v="113", "Chromium";v="113", "Not-A.Brand";v="24"`},
+		"sec-ch-ua-mobile":    {"?0"},
+		"sec-fetch-dest":      {"empty"},
+		"sec-fetch-mode":      {"cors"},
+		"sec-fetch-site":      {"same-origin"},
+		"user-agent":          {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"},
+		"x-api-lang":          {"en"},
+		"x-fl-request-id":     {uuid.New().String()},
+		"x-flgw-channel-info": {"WEB"},
+		"x-mobile-device":     {"false"},
 		http.HeaderOrderKey: {
 			"authority",
 			"accept",
@@ -823,12 +1227,10 @@ func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
 			"accept-language",
 			"content-length",
 			"content-type",
+			"origin",
 			"referer",
-			"cache-control",
 			"sec-ch-ua",
-			"sec-ch-ua-full-version-list",
 			"sec-ch-ua-mobile",
-			"sec-ch-ua-model",
 			"sec-fetch-dest",
 			"sec-fetch-mode",
 			"sec-fetch-site",
@@ -842,17 +1244,46 @@ func (f *Footlocker) PlaceOrder(task shared.Task) (int, error) {
 
 	res, err := f.Client.Do(req)
 	if err != nil {
-		f.Log.Debug("PlaceOrder response error: ", err)
+		f.Log.Error("PlaceOrder response error: ", err)
 		return 0, err
 	}
+
+	domain := req.URL
+
+	if res.StatusCode != 200 {
+
+		ddCookie := f.GenerateCookies(cid, domain)
+
+		// Modify a cookie value
+		cookies := f.Client.GetCookies(req.URL)
+		for _, cookie := range cookies {
+			if cookie.Name == "datadome" {
+				cookie.Value = ddCookie
+				break
+			}
+		}
+
+		// Print the updated cookies
+		for _, cookie := range cookies {
+			fmt.Printf("Name: %s, Value: %s\n", cookie.Name, cookie.Value)
+		}
+
+		f.Client.SetCookies(req.URL, cookies)
+
+		f.Log.Warning("PlaceOrder: ", res.StatusCode)
+
+		return f.PlaceOrder(task, encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedSecurityCode, cid)
+	}
+
+	defer res.Body.Close()
 
 	return res.StatusCode, nil
 }
 
 // Helpers
-func (f *Footlocker) AdyenEncrypt(task shared.Task, publicKey string) (int, string, string, string, string, error) {
+func (f *Footlocker) AdyenEncrypt(task shared.Task, encryptionKey string) (int, string, string, string, string, error) {
 
-	var plaintextKey = publicKey
+	var plaintextKey = encryptionKey
 	key := strings.Split(plaintextKey, "|")[1]
 	fmt.Println("key: ", key)
 	b, err := hex.DecodeString(key)
@@ -895,5 +1326,27 @@ func (f *Footlocker) Flip() string {
 
 	}
 
-	return "success"
+	return f.Client.GetProxy()
+}
+
+func (f *Footlocker) GenerateCookies(cid string, domain *url.URL) string {
+	newProxy := f.Flip()
+
+	f.Log.Debug("ddProxy: ", newProxy)
+
+	// Generate ddCookie
+	status, ddCookie, _ := f.DD.GenCh(cid, domain.String(), newProxy)
+	if status != 200 && ddCookie == "" {
+		f.Log.Warning("ddCookie status: ", status)
+		f.Log.Error("ddCookie not generated: ", ddCookie)
+
+		time.Sleep(2 * time.Second)
+
+		return f.GenerateCookies(cid, domain)
+	}
+
+	f.Log.Info("ddCookie found: ", ddCookie)
+	f.Client.SetProxy(newProxy)
+	return ddCookie
+
 }
