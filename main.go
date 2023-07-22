@@ -36,7 +36,7 @@ func main() {
 			BirthMonth:  1,
 			BirthYear:   1,
 			Gender:      "",
-			Email:       "asm.dev29@gmail.com",
+			Email:       "email",
 			Phone:       "2025961737",
 			Address:     "83 Pendergast Street",
 			Address2:    "",
