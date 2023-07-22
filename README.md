@@ -2,6 +2,68 @@
 
 This repository contains a Sneaker BOT designed for Footlocker USA, which allows users to automate the process of purchasing sneakers from the Footlocker website. The BOT is built using Go programming language and is organized into different modules and components for better maintainability and extensibility.
 
+## Below is the project structure for the Sneaker BOT for Footlocker USA:
+
+```
+- Footlocker
+  - internal
+    - datadome
+      - types.go
+    - footlocker
+      - types.go
+    - logger
+      - logger.go
+    - shared
+      - types.go
+    - datadome-solution.go
+    - datadome_payload.json
+    - footlocker-module.go
+    - proxies.txt
+    - proxy-rotator.go
+  - go.mod
+  - go.sum
+  - main.go
+```
+
+### Project Structure Explanation:
+
+- **`Footlocker/`**: The root directory of the project.
+
+  - **`internal/`**: Contains internal packages and components used by the BOT.
+
+    - **`datadome/`**: Package responsible for handling Datadome integration.
+
+      - **`types.go`**: Defines data structures and types specific to the Datadome module.
+
+    - **`footlocker/`**: Package containing functionalities related to Footlocker.
+
+      - **`types.go`**: Defines data structures and types specific to the Footlocker module.
+
+    - **`logger/`**: Package for logging events and actions during the BOT execution.
+
+      - **`logger.go`**: Defines the logging behavior and implementation.
+
+    - **`shared/`**: Shared package containing common data structures and functions used across modules.
+
+      - **`types.go`**: Defines shared data structures and types.
+
+    - **`datadome-solution.go`**: File containing the solution to bypass Datadome bot detection.
+
+    - **`datadome_payload.json`**: JSON file containing payload data required for Datadome integration.
+
+    - **`footlocker-module.go`**: The main module containing core functionalities of the Footlocker BOT.
+
+    - **`proxies.txt`**: Text file containing a list of proxies that can be used for anonymous purchase attempts.
+
+    - **`proxy-rotator.go`**: Implements the logic for rotating through the list of proxies.
+
+  - **`go.mod`**: Go module file specifying the dependencies and their versions.
+
+  - **`go.sum`**: Go checksum file containing the expected cryptographic hashes of the module sources.
+
+  - **`main.go`**: The entry point of the application. Contains code to run the Footlocker Sneaker BOT.
+
+
 ## Usage
 
 ### Prerequisites
