@@ -1,10 +1,10 @@
-package internal
+package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"footlocker-bot/internal/datadome"
-	"footlocker-bot/internal/logger"
+	"footlocker-bot/datadome"
+	"footlocker-bot/logger"
 	"io"
 	"math"
 	"math/rand"

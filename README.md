@@ -6,20 +6,19 @@ This repository contains a Sneaker BOT designed for Footlocker USA, which allows
 
 ```
 - Footlocker
-  - internal
-    - datadome
-      - types.go
-    - footlocker
-      - types.go
-    - logger
-      - logger.go
-    - shared
-      - types.go
-    - datadome-solution.go
-    - datadome_payload.json
-    - footlocker-module.go
-    - proxies.txt
-    - proxy-rotator.go
+  - datadome
+    - types.go
+  - footlocker
+    - types.go
+  - logger
+    - logger.go
+  - shared
+    - types.go
+  - datadome-solution.go
+  - datadome_payload.json
+  - footlocker-module.go
+  - proxies.txt
+  - proxy-rotator.go
   - go.mod
   - go.sum
   - main.go
@@ -29,40 +28,37 @@ This repository contains a Sneaker BOT designed for Footlocker USA, which allows
 
 - **`Footlocker/`**: The root directory of the project.
 
-  - **`internal/`**: Contains internal packages and components used by the BOT.
+  - **`datadome/`**: Package responsible for handling Datadome integration.
 
-    - **`datadome/`**: Package responsible for handling Datadome integration.
+    - **`types.go`**: Defines data structures and types specific to the Datadome module.
 
-      - **`types.go`**: Defines data structures and types specific to the Datadome module.
+  - **`footlocker/`**: Package containing functionalities related to Footlocker.
 
-    - **`footlocker/`**: Package containing functionalities related to Footlocker.
+    - **`types.go`**: Defines data structures and types specific to the Footlocker module.
 
-      - **`types.go`**: Defines data structures and types specific to the Footlocker module.
+  - **`logger/`**: Package for logging events and actions during the BOT execution.
 
-    - **`logger/`**: Package for logging events and actions during the BOT execution.
+    - **`logger.go`**: Defines the logging behavior and implementation.
 
-      - **`logger.go`**: Defines the logging behavior and implementation.
+  - **`shared/`**: Shared package containing common data structures and functions used across modules.
 
-    - **`shared/`**: Shared package containing common data structures and functions used across modules.
+    - **`types.go`**: Defines shared data structures and types.
 
-      - **`types.go`**: Defines shared data structures and types.
+  - **`datadome-solution.go`**: File containing the solution to bypass Datadome bot detection.
 
-    - **`datadome-solution.go`**: File containing the solution to bypass Datadome bot detection.
+  - **`datadome_payload.json`**: JSON file containing payload data required for Datadome integration.
 
-    - **`datadome_payload.json`**: JSON file containing payload data required for Datadome integration.
+  - **`footlocker-module.go`**: The main module containing core functionalities of the Footlocker BOT.
 
-    - **`footlocker-module.go`**: The main module containing core functionalities of the Footlocker BOT.
+  - **`proxies.txt`**: Text file containing a list of proxies that can be used for anonymous purchase attempts.
 
-    - **`proxies.txt`**: Text file containing a list of proxies that can be used for anonymous purchase attempts.
-
-    - **`proxy-rotator.go`**: Implements the logic for rotating through the list of proxies.
+  - **`proxy-rotator.go`**: Implements the logic for rotating through the list of proxies.
 
   - **`go.mod`**: Go module file specifying the dependencies and their versions.
 
   - **`go.sum`**: Go checksum file containing the expected cryptographic hashes of the module sources.
 
   - **`main.go`**: The entry point of the application. Contains code to run the Footlocker Sneaker BOT.
-
 
 ## Usage
 
@@ -137,7 +133,7 @@ Before running the BOT, you need to set up the necessary configurations:
 Once you have configured the proxies and set the `ProductURL`, you can run the Footlocker Sneaker BOT. Open your terminal or command prompt, navigate to the root directory of the project, and execute the following command:
 
 ```
-go run main.go
+go run .
 ```
 
 The BOT will initiate the automated process of purchasing sneakers from the specified Footlocker USA product page. It will handle the bot detection mechanisms using Datadome integration and automatically rotate through the list of proxies from `proxies.txt` to ensure a seamless and anonymous purchasing experience.

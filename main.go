@@ -1,14 +1,13 @@
 package main
 
 import (
-	"footlocker-bot/internal"
-	"footlocker-bot/internal/logger"
-	"footlocker-bot/internal/shared"
+	"footlocker-bot/logger"
+	"footlocker-bot/shared"
 )
 
 func main() {
 	l := logger.NewLogger()
-	footlocker := internal.NewFootlockerBot()
+	footlocker := NewFootlockerBot()
 
 	l.EnableDebug()
 

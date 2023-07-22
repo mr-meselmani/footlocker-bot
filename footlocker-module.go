@@ -1,13 +1,13 @@
-package internal
+package main
 
 import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"footlocker-bot/internal/footlocker"
-	"footlocker-bot/internal/logger"
-	"footlocker-bot/internal/shared"
+	"footlocker-bot/footlocker"
+	"footlocker-bot/logger"
+	"footlocker-bot/shared"
 	"io"
 	"net/url"
 	"regexp"

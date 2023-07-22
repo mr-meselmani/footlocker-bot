@@ -1,4 +1,4 @@
-package internal
+package main
 
 import (
 	"bufio"
@@ -22,7 +22,7 @@ func ProxyRotator(useProxy bool) string {
 	path, _ := os.Getwd()
 
 	// Open the file
-	file, err := os.Open(path + "/internal/proxies.txt")
+	file, err := os.Open(path + "./proxies.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
